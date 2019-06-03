@@ -35,6 +35,11 @@ process_py() {
     local import_sorted="$(isort -q -ac "$1" -d)"
     if [ -z "$import_sorted" ]; then
         import_sorted="$(cat "$1")"
+    else
+        if echo "$import_sorted" | grep -q "^ERROR:"; then
+            echo "$import_sorted" >&2
+            exit 1
+        fi
     fi
 
     local black_config="$(read_config "**.py" black_file)"
