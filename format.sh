@@ -38,19 +38,17 @@ process_py() {
     fi
 
     local black_config="$(read_config "**.py" black_file)"
-    if [ -n "$black_config" ]; then
+    if [ -f "$black_config" ]; then
         black_config="--config $black_config"
     fi
 
     __return="$(echo "$import_sorted" | black $black_config -)"
-
-    return 0
 }
 
 process_sh() {
-    if ! hash shfmt; then
+    if ! hash shfmt 2>/dev/null; then
         echo >&2 "Bash: shfmt is not installed"
-        exit 1echo "$formatted"echo "$formatted"
+        exit 1
     fi
 
     local language_variant="$(read_config "**.sh" language_variant)"
@@ -89,8 +87,6 @@ process_sh() {
     fi
 
     __return="$(shfmt $language_variant $indent_size $binary_start $ident_case $space_redirect $keep_padding $minify "$1")"
-
-    return 0
 }
 
 if [ "$#" -lt "1" ]; then
@@ -104,7 +100,7 @@ for file in "$@"; do
         continue
     fi
 
-    file="$(realpath --relative-to="$__pwd" "$file")"
+    file="$(realpath --relative-to="$__dir" "$file")"
     filename="$(basename -- "$file")"
     file_ext="${filename##*.}"
 
