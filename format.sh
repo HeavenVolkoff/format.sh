@@ -3,8 +3,8 @@
 # --- Command Interpreter Configuration ----------------------------------------
 
 # Command Interpreter Configuration
-set -e          # exit immediate if an error occurs in a pipeline
-set -u          # don't allow not set variables to be utilized
+set -e # exit immediate if an error occurs in a pipeline
+set -u # don't allow not set variables to be utilized
 set -o pipefail # trace ERR through pipes
 set -o errtrace # trace ERR through 'time command' and other functions
 # set -x # Debug this shell script
