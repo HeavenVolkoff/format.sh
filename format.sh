@@ -3,8 +3,8 @@
 # --- Command Interpreter Configuration ----------------------------------------
 
 # Command Interpreter Configuration
-set -e # exit immediate if an error occurs in a pipeline
-set -u # don't allow not set variables to be utilized
+set -e          # exit immediate if an error occurs in a pipeline
+set -u          # don't allow not set variables to be utilized
 set -o pipefail # trace ERR through pipes
 set -o errtrace # trace ERR through 'time command' and other functions
 # set -x # Debug this shell script
@@ -17,6 +17,8 @@ readonly __file="${__dir}/$(basename -- "$0")"
 readonly __base="$(basename "${__file}" .sh)"
 readonly __root="$(cd "$(dirname "${__dir}")" && pwd)"
 __return=""
+
+command -v realpath >/dev/null 2>&1 || realpath() { python -c "import os; print(os.path.realpath('$1'))"; }
 
 # Modified from http://stackoverflow.com/a/12498485
 relativePath() {
@@ -161,7 +163,7 @@ for file in "$@"; do
         continue
     fi
 
-    file="$(relativePath "$__pwd" "$(readlink -f "$file")")"
+    file="$(relativePath "$__pwd" "$(realpath "$file")")"
     filename="$(basename -- "$file")"
     file_ext="${filename##*.}"
 
