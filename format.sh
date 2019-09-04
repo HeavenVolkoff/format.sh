@@ -18,6 +18,52 @@ readonly __base="$(basename "${__file}" .sh)"
 readonly __root="$(cd "$(dirname "${__dir}")" && pwd)"
 __return=""
 
+command -v realpath >/dev/null 2>&1 || realpath() { python -c "import os; print(os.path.realpath('$1'))"; }
+
+# Modified from http://stackoverflow.com/a/12498485
+relativePath() {
+    # both $1 and $2 are absolute paths beginning with /
+    # returns relative path to $2 from $1
+    local source="$1"
+    local target="$2"
+
+    local commonPart="$source"
+    local result=""
+
+    while [ "${target#$commonPart}" == "${target}" ]; do
+        # no match, means that candidate common part is not correct
+        # go up one level (reduce common part)
+        commonPart="$(dirname "$commonPart")"
+        # and record that we went back, with correct / handling
+        if [[ -z "$result" ]]; then
+            result=".."
+        else
+            result="../$result"
+        fi
+    done
+
+    if [ "$commonPart" == "/" ]; then
+        # special case for root (no common path)
+        result="$result/"
+    fi
+
+    # since we now have identified the common part,
+    # compute the non-common part
+    local forwardPart="${target#$commonPart}"
+
+    # and now stick all parts together
+    if [ -n "$forwardPart" ]; then
+        if [ -n "$result" ]; then
+            result="$result$forwardPart"
+        else
+            # extra slash removal
+            result="${forwardPart#?}"
+        fi
+    fi
+
+    echo "$result"
+}
+
 read_config() {
     if [ -f "./.editorconfig" ]; then
         # shellcheck disable=SC2005
@@ -117,7 +163,7 @@ for file in "$@"; do
         continue
     fi
 
-    file="$(realpath --relative-to="$__dir" "$file")"
+    file="$(relativePath "$__pwd" "$(realpath "$file")")"
     filename="$(basename -- "$file")"
     file_ext="${filename##*.}"
 
