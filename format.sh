@@ -152,15 +152,15 @@ process_sh() {
     __return="$(shfmt $language_variant $indent_size $binary_start $ident_case $space_redirect $keep_padding $minify "$1")"
 }
 
-if [ "$#" -lt "1" ]; then
-    echo >&2 "Missing argument"
-    exit 1
-fi
+main_loop() {
+    local file=$1
 
-for file in "$@"; do
     if ! [ -f "$file" ]; then
-        echo >&2 "$file: Doesn't exist"
-        continue
+        cat << EOF >&2
+${file}:
+  Doesn't exist
+EOF
+        return
     fi
 
     file="$(relativePath "$__pwd" "$(realpath "$file")")"
@@ -169,26 +169,59 @@ for file in "$@"; do
 
     process="process_${file_ext}"
     if ! type "$process" 1>/dev/null 2>&1; then
-        echo >&2 "$file:"
-        echo >&2 "  Doesn't have a recognizable extension"
-        continue
+        cat << EOF >&2
+${file}:
+  Doesn't have a recognizable extension
+EOF
+        return
     fi
 
     if [ -s "$file" ]; then
         if $process "$file" && [ -n "$__return" ]; then
             formatted="$__return"
         else
-            echo >&2 "$file:"
-            echo >&2 "  Failed to formatted"
-            continue
+            cat << EOF >&2
+${file}:
+  Failed to formatted
+EOF
+            return
         fi
     else
-        echo >&2 "$file:"
-        echo >&2 "  Is empty"
-        continue
+        cat << EOF >&2
+${file}:
+  Is empty
+EOF
+        return
     fi
 
     echo "$formatted" >"$file"
-    echo >&2 "$file:"
-    echo >&2 "  Formatted"
+    cat << EOF >&2
+${file}:
+  Formatted
+EOF
+}
+
+if [ "$#" -lt "1" ]; then
+    echo >&2 "Missing argument"
+    exit 1
+fi
+
+i=0
+pids=( )
+cores=$(nproc)
+for file in "$@"; do
+    if [ "$i" -ge "$cores" ]; then
+        for pid in ${pids[*]}; do
+            wait $pid
+        done
+        i=0
+        pids=( )
+    fi
+    main_loop "$file" &
+    pids[${i}]=$!
+    i=$((i+1))
+done
+
+for pid in ${pids[*]}; do
+    wait $pid
 done
