@@ -100,6 +100,10 @@ process_py() {
     __return="$(echo "$import_sorted" | black $black_config - 2>/dev/null)"
 }
 
+process_pyi() {
+    process_py $@
+}
+
 process_sh() {
     local minify
     local ident_case
