@@ -82,9 +82,10 @@ process_py() {
         return 1
     fi
 
-    import_sorted="$(isort -q -ac "$1" -d)"
+    imported_clean="$(sed -r '/^# (Internal|Standard|External|Indirect|Project)$/d' "$1")"
+    import_sorted="$(echo "$imported_clean" | isort -q -ac -)"
     if [ -z "$import_sorted" ]; then
-        import_sorted="$(cat "$1")"
+        import_sorted="$imported_clean"
     else
         if echo "$import_sorted" | grep -q "^ERROR:"; then
             echo "$import_sorted" >&2
