@@ -78,7 +78,7 @@ process_py() {
     local import_sorted
 
     if ! { hash isort && hash black; } 2>/dev/null; then
-        echo >&2 "Python: isort or black is not installed"
+        __return="Python: isort or black is not installed"
         return 1
     fi
 
@@ -88,8 +88,8 @@ process_py() {
         import_sorted="$imported_clean"
     else
         if echo "$import_sorted" | grep -q "^ERROR:"; then
-            echo "$import_sorted" >&2
-            exit 1
+            __return="$import_sorted"
+            return 1
         fi
     fi
 
@@ -115,8 +115,8 @@ process_sh() {
     local language_variant
 
     if ! hash shfmt 2>/dev/null; then
-        echo >&2 "Bash: shfmt is not installed"
-        exit 1
+        __return="Bash: shfmt is not installed"
+        return 1
     fi
 
     language_variant="$(read_config "**.sh" language_variant)"
@@ -165,7 +165,7 @@ main_loop() {
 ${file}:
   Doesn't exist
 EOF
-        return
+        return 1
     fi
 
     file="$(relativePath "$__pwd" "$(realpath "$file")")"
@@ -178,7 +178,7 @@ EOF
 ${file}:
   Doesn't have a recognizable extension
 EOF
-        return
+        return 1
     fi
 
     if [ -s "$file" ]; then
@@ -187,16 +187,17 @@ EOF
         else
             cat << EOF >&2
 ${file}:
-  Failed to formatted
+  Failed to format
+  ${__return}
 EOF
-            return
+            return 1
         fi
     else
         cat << EOF >&2
 ${file}:
   Is empty
 EOF
-        return
+        return 0
     fi
 
     echo "$formatted" >"$file"
@@ -214,10 +215,13 @@ fi
 i=0
 pids=( )
 cores=$(nproc)
+status=0
 for file in "$@"; do
     if [ "$i" -ge "$cores" ]; then
         for pid in ${pids[*]}; do
-            wait $pid
+            if ! wait $pid; then
+                status=1
+            fi
         done
         i=0
         pids=( )
@@ -228,5 +232,9 @@ for file in "$@"; do
 done
 
 for pid in ${pids[*]}; do
-    wait $pid
+    if ! wait $pid; then
+        status=1
+    fi
 done
+
+exit $status
