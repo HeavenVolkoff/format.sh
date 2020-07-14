@@ -77,13 +77,17 @@ process_py() {
     local black_config
     local import_sorted
 
+    if [ -f '.venv/bin/activate' ]; then
+        source .venv/bin/activate
+    fi
+
     if ! { hash isort && hash black; } 2>/dev/null; then
         __return="Python: isort or black is not installed"
         return 1
     fi
 
     imported_clean="$(sed -r '/^# (Internal|Standard|External|Indirect|Project)$/d' "$1")"
-    import_sorted="$(echo "$imported_clean" | isort -q -ac -)"
+    import_sorted="$(echo "$imported_clean" | isort --quiet --atomic -)"
     if [ -z "$import_sorted" ]; then
         import_sorted="$imported_clean"
     else
