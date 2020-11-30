@@ -9,6 +9,7 @@ if __name__ == "__main__":
         print("Missing arguments", file=sys.stderr)
         sys.exit(-1)
 
+    # Internal
     from itertools import chain
 
     parser = ConfigParser()

@@ -87,7 +87,7 @@ process_py() {
     fi
 
     imported_clean="$(sed -r '/^# (Internal|Standard|External|Indirect|Project)$/d' "$1")"
-    import_sorted="$(echo "$imported_clean" | isort --quiet --atomic -)"
+    import_sorted="$(echo "$imported_clean" | isort -d --quiet --atomic -)"
     if [ -z "$import_sorted" ]; then
         import_sorted="$imported_clean"
     else
