@@ -14,11 +14,23 @@ set -o errtrace # trace ERR through 'time command' and other functions
 readonly __pwd="$(pwd)"
 readonly __dir=$(CDPATH="" cd -- "$(dirname -- "$0")" && pwd)
 readonly __file="${__dir}/$(basename -- "$0")"
-readonly __base="$(basename "${__file}" .sh)"
-readonly __root="$(cd "$(dirname "${__dir}")" && pwd)"
-__return=""
 
 command -v realpath >/dev/null 2>&1 || realpath() { python -c "import os; print(os.path.realpath('$1'))"; }
+
+# From https://stackoverflow.com/q/11027679#answer-41069638
+catch() {
+    eval "$({
+        __2="$(
+            { __1="$("${@:3}")"; } 2>&1
+            ret=$?
+            printf '%q=%q\n' "$1" "$__1" >&2
+            exit $ret
+        )"
+        ret="$?"
+        printf '%s=%q\n' "$2" "$__2" >&2
+        printf '( exit %q )' "$ret" >&2
+    } 2>&1)"
+}
 
 # Modified from http://stackoverflow.com/a/12498485
 relativePath() {
@@ -82,7 +94,7 @@ process_py() {
     fi
 
     if ! { hash isort && hash black; } 2>/dev/null; then
-        __return="Python: isort or black is not installed"
+        echo "Python: isort or black is not installed" >&2
         return 1
     fi
 
@@ -92,7 +104,7 @@ process_py() {
         import_sorted="$imported_clean"
     else
         if echo "$import_sorted" | grep -q "^ERROR:"; then
-            __return="$import_sorted"
+            echo "$import_sorted" >&2
             return 1
         fi
     fi
@@ -102,11 +114,11 @@ process_py() {
         black_config="--config $black_config"
     fi
 
-    __return="$(echo "$import_sorted" | black $black_config - 2>/dev/null)"
+    echo "$import_sorted" | black $black_config - 2>/dev/null
 }
 
 process_pyi() {
-    process_py $@
+    process_py "$@"
 }
 
 process_sh() {
@@ -119,7 +131,7 @@ process_sh() {
     local language_variant
 
     if ! hash shfmt 2>/dev/null; then
-        __return="Bash: shfmt is not installed"
+        echo "Bash: shfmt is not installed" >&2
         return 1
     fi
 
@@ -158,14 +170,14 @@ process_sh() {
         minify="-mn"
     fi
 
-    __return="$(shfmt $language_variant $indent_size $binary_start $ident_case $space_redirect $keep_padding $minify "$1")"
+    shfmt $language_variant $indent_size $binary_start $ident_case $space_redirect $keep_padding $minify "$1"
 }
 
 main_loop() {
     local file=$1
 
     if ! [ -f "$file" ]; then
-        cat << EOF >&2
+        cat <<EOF  >&2
 ${file}:
   Doesn't exist
 EOF
@@ -178,37 +190,33 @@ EOF
 
     process="process_${file_ext}"
     if ! type "$process" 1>/dev/null 2>&1; then
-        cat << EOF >&2
+        cat <<EOF  >&2
 ${file}:
   Doesn't have a recognizable extension
 EOF
         return 1
     fi
 
-    if [ -s "$file" ]; then
-        if $process "$file" && [ -n "$__return" ]; then
-            formatted="$__return"
-        else
-            cat << EOF >&2
-${file}:
-  Failed to format
-  ${__return}
-EOF
-            return 1
-        fi
-    else
-        cat << EOF >&2
+    if ! [ -s "$file" ]; then
+        cat <<EOF  >&2
 ${file}:
   Is empty
 EOF
-        return 0
-    fi
-
-    echo "$formatted" >"$file"
-    cat << EOF >&2
+    elif catch content error "$process" "$file" && [ -n "$content" ] && [ -z "$error" ]; then
+        echo "$content" >"$file"
+            cat <<EOF  >&2
 ${file}:
   Formatted
 EOF
+    else
+        cat <<EOF  >&2
+${file}:
+  Failed to format -> ${error:-Unknown error}
+EOF
+        return 1
+    fi
+
+    return 0
 }
 
 if [ "$#" -lt "1" ]; then
@@ -217,7 +225,7 @@ if [ "$#" -lt "1" ]; then
 fi
 
 i=0
-pids=( )
+pids=()
 cores=$(nproc)
 status=0
 for file in "$@"; do
@@ -228,11 +236,11 @@ for file in "$@"; do
             fi
         done
         i=0
-        pids=( )
+        pids=()
     fi
     main_loop "$file" &
     pids[${i}]=$!
-    i=$((i+1))
+    i=$((i + 1))
 done
 
 for pid in ${pids[*]}; do
